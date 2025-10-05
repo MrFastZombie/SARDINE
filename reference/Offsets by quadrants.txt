@@ -1,0 +1,30 @@
+Offsets by quadrants
+-X -Y | X -Y
+-------------
+-X  Y | X  Y
+
+
+Diagonal straight rail
+-> Curved rail B - 3 3
+-> Diagonal straight rail - 2 2
+
+Straight Rail 
+-> Curved rail A - Offset 3 in axis of movement
+-> Straight rail - Offset 2 in axis of movement
+
+Curved rail a ( | )  (_: Swap)
+-> Straight rail - 0 3
+-> Curved rail a - 0 4 / 2 6
+-> Curved rail b - 2 5
+-> Half-diagonal rail - 2 5 (This and above can happen on the same dir. Prefer natural direction.)
+
+Curved rail b ( / & \ )
+-> Diagonal straight rail - 3 3
+-> Half-diagonal rail - 2 4 / 4 2 (just check both i guess...)
+-> Curved rail a - 2 5 / 5 2
+-> Curved rail b - 2 4 / 4 2
+
+Half diagonal rail
+-> Half diagonal rail - 2 4 / 4 2
+-> Curved rail a - 2 5 / 5 2
+-> Curved rail b - 2 4 / 4 2
