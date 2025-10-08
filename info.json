@@ -5,5 +5,5 @@
   "author": "MrFastZombie",
   "factorio_version": "2.0",
   "dependencies": ["base >= 2.0"],
-  "description": "A locomotive that can build rail according to a blueprint or on the fly."
+  "description": "A locomotive that can build rail along rail ghosts or on the fly."
 }
