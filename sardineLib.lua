@@ -34,7 +34,7 @@ end
 function sardineLib.getSardine(id)
 end
 
----aaaa
+---Get the last rail. Old function, probably best not to rely on it. 
 ---@param sardine LuaEntity
 function getLastRail(sardine)
     local rail = sardine.train.front_end.rail
@@ -58,7 +58,7 @@ function getLastRail(sardine)
     return last
 end
 
----Gets the relative orientation of a rail compared to SARDINE..
+---Gets the relative orientation of a rail compared to SARDINE. Another old function that might need to be redone or removed, but no issues stemming from it are apparent yet.
 ---@param rail LuaEntity
 ---@param sardine LuaEntity
 function getRelativeOrientation(rail, sardine)
@@ -100,8 +100,12 @@ function getRelativeOrientation(rail, sardine)
     return orientation
 end
 
+---Helper function, displays floating debug text when debugging is enabled.
+---@param msg string
+---@param pos {x:number, y:number}
 function debugFlyMsg(msg, pos)
     local debug = true
+    --TODO: Add a debug setting.
     if debug == true then
         if #storage.data["tickingSardines"] == 0 then return end
         for index, value in pairs(storage.data["tickingSardines"]) do
@@ -155,7 +159,7 @@ function isRailRamp(entity)
     return false
 end
 
----comments
+---Checks if the given rail is elevated.
 ---@param rail LuaEntity
 ---@return boolean
 function isRailElevated(rail)
@@ -167,6 +171,7 @@ end
 
 ---Snaps orientation to a valid direction.
 ---@param orientation any
+---@return number
 function snapOrientation(orientation)
     local smallestDifference = 0.9375
     local pick = 0
@@ -185,22 +190,20 @@ function snapOrientation(orientation)
     return pick
 end
 
----yeah
+---Gives an array of detected rail ghosts that are potential traversals from the given piece. First piece should always be the natural traversal, which is always a right turn when given 2 turns and no straight.
 ---@param rail LuaEntity
+---@param movementOrientation number
+---@param sardine LuaEntity
 ---@return (LuaEntity)[]
 function getPossibleTraversalPieces(rail, movementOrientation, sardine)
     local railType = nil
         if rail.name ~= "entity-ghost" then railType = rail.name
         else railType = rail.ghost_type end
     local elevated = isRailElevated(rail)
-    local orientation = snapOrientation(rail.orientation)
-    local offset = {x=0, y=0}
     local offsetMult = {x=1,y=1}
     local checkTiles = {}
-    local checkMap = {
-        ["straight-rail"] = {{"straight-rail", 2}, {"curved-rail-a", 3}}
-    }
 
+    --- QUADRANT OFFSET ---
     if movementOrientation >= 0 and movementOrientation <= 0.25 then --First quadrant
         offsetMult.y = -1
     elseif movementOrientation > 0.5 and movementOrientation <= 0.75 then --Third quadrant | Skipped the second quadrant as that is the default mult.
@@ -209,38 +212,38 @@ function getPossibleTraversalPieces(rail, movementOrientation, sardine)
         offsetMult.x = -1
         offsetMult.y = -1
     end
+    --- END OF QUADRANT OFFSET ---
 
     local snappedOrientation = snapOrientation(movementOrientation)
 
-    --I have decided that despite the pain of doing it, manually defining possible movements is the best way to do this. Though I do fear how this might affect mod-added rail compatibility.
-    if railType == "straight-rail" or railType == "elevated-straight-rail"  then
-        if snappedOrientation == 0 or snappedOrientation == 0.5 then
-            local straightRail = {
+    --Explanation of the code below:
+    --The code checks the rail type and adds all of its potential traversal pieces to a list that is then checked below.
+    --When the traversal pieces are checked, the entity search function filters to just that piece type and whatever offset was given.
+    --The quadrant offset code above sets the polarity of the offsets below.
+    --Some pieces need special action. For example, straight rail has to be offset along its traversal direction. (i.e. a piece facing north or south needs to be offset along the Y axis.)
+    --See the table picture in the reference folder to see all the conditions I am checking for.
+    if railType == "straight-rail" or railType == "elevated-straight-rail"  then --Straight rail & Diagonal Straight Rail
+        if snappedOrientation == 0 or snappedOrientation == 0.5 then --North/South
+            table.insert(checkTiles,{
                 "straight-rail", {x=0,y=2*offsetMult.y}
-            }
-            local curvedRailA = {
+            })
+            table.insert(checkTiles,{
                 "curved-rail-a", {x=0,y=3*offsetMult.y}
-            }
-            local railRamp = {
+            })
+            table.insert(checkTiles,{
                 "rail-ramp", {x=0,y=9*offsetMult.y}
-            }
-            table.insert(checkTiles,straightRail)
-            table.insert(checkTiles,curvedRailA)
-            table.insert(checkTiles,railRamp)
-        elseif snappedOrientation == 0.25 or snappedOrientation == 0.75 then
-            local straightRail = {
+            })
+        elseif snappedOrientation == 0.25 or snappedOrientation == 0.75 then --East/West
+            table.insert(checkTiles,{
                 "straight-rail", {x=2*offsetMult.x,y=0}
-            }
-            local curvedRailA = {
+            })
+            table.insert(checkTiles,{
                 "curved-rail-a", {x=3*offsetMult.x,y=0}
-            }
-            local railRamp = {
+            })
+            table.insert(checkTiles,{
                 "rail-ramp", {x=9*offsetMult.x,y=0}
-            }
-            table.insert(checkTiles,straightRail)
-            table.insert(checkTiles,curvedRailA)
-            table.insert(checkTiles,railRamp)
-        elseif snappedOrientation == 0.375 or snappedOrientation == 0.875 or snappedOrientation == 0.125 or snappedOrientation == 0.625 then
+            })
+        elseif snappedOrientation == 0.375 or snappedOrientation == 0.875 or snappedOrientation == 0.125 or snappedOrientation == 0.625 then --Diagonal straight rail, any direction
             table.insert(checkTiles, {
                 "curved-rail-b", {x=3*offsetMult.x,y=3*offsetMult.y}
             })
@@ -248,9 +251,9 @@ function getPossibleTraversalPieces(rail, movementOrientation, sardine)
                 "straight-rail", {x=2*offsetMult.x,y=2*offsetMult.y}
             })
         else
-            log("SARDINE: Found a "..railType.." but the orientation was unexpected! Snapped Orientation: " ..snappedOrientation)
+            log("SARDINE: Found a "..railType.." but the orientation was unexpected! Snapped Orientation: " ..snappedOrientation) --This probably isn't going to happen but I know better to ignore edge cases.
         end
-    elseif railType == "half-diagonal-rail" or railType == "elevated-half-diagonal-rail" then
+    elseif railType == "half-diagonal-rail" or railType == "elevated-half-diagonal-rail" then --Half-diagonal rail
         table.insert(checkTiles, {
             "curved-rail-a", {x=2*offsetMult.x,y=5*offsetMult.y}
         })
@@ -269,7 +272,7 @@ function getPossibleTraversalPieces(rail, movementOrientation, sardine)
         table.insert(checkTiles, {
             "half-diagonal-rail", {x=4*offsetMult.x,y=2*offsetMult.y}
         })
-    elseif railType == "curved-rail-a" or railType == "elevated-curved-rail-a"  then
+    elseif railType == "curved-rail-a" or railType == "elevated-curved-rail-a"  then --Curved rail A
         local tileQueue = {} --This one needs a queue to handle swapping values conditionally.
         table.insert(tileQueue, {
             "straight-rail", {x=0,y=3} --Offset multiplier waits until the offset value is finalized below.
@@ -302,7 +305,7 @@ function getPossibleTraversalPieces(rail, movementOrientation, sardine)
             tile[2].y = tile[2].y*offsetMult.y
             table.insert(checkTiles, tile) --Send to main queue
         end
-    elseif railType == "curved-rail-b" or railType == "elevated-curved-rail-b"  then
+    elseif railType == "curved-rail-b" or railType == "elevated-curved-rail-b"  then --Curved rail B
         table.insert(checkTiles, {
             "curved-rail-a", {x=2*offsetMult.x,y=5*offsetMult.y}
         })
@@ -327,8 +330,8 @@ function getPossibleTraversalPieces(rail, movementOrientation, sardine)
         table.insert(checkTiles, {
             "half-diagonal-rail", {x=4*offsetMult.x,y=2*offsetMult.y}
         })
-    elseif railType == "rail-ramp" then
-        local tileQueue = {}
+    elseif railType == "rail-ramp" then -- Rail ramp
+        local tileQueue = {} --Once again needs a queue. I probably could've done this with the straight rails too.
         table.insert(tileQueue, {
             "straight-rail", {x=0,y=9}
         })
@@ -355,23 +358,22 @@ function getPossibleTraversalPieces(rail, movementOrientation, sardine)
 
     local output = {}
 
-    if rail.name == "entity-ghost" then
+    if rail.name == "entity-ghost" then --Setting elevated to true when going up a ramp. (I think it'll become false when going down a ramp on its own.)
         if rail.ghost_name == "rail-ramp" then
             if rail.orientation == snappedOrientation then elevated = true end
         end
     end
-    if rail.name == "rail-ramp" then
+    if rail.name == "rail-ramp" then --Not sure if this is necessary but it doesn't hurt.
         if rail.orientation == snappedOrientation then elevated = true end
     end
 
 
-    for index, tile in ipairs(checkTiles) do
+    for index, tile in ipairs(checkTiles) do --Search all the potential spots.
         local name = tile[1]
-        if elevated and name ~= "rail-ramp" then name = "elevated-"..name end
+        if elevated and name ~= "rail-ramp" then name = "elevated-"..name end --If elevated and not a ramp, add elevated to the name.
         local position = rail.position
         position.x = position.x+tile[2].x
         position.y = position.y+tile[2].y
-        --TODO: Detect if ramp is going to elevated or to ground.
         local found = rail.surface.find_entities_filtered{position = position, radius = 1, type="entity-ghost", ghost_name=name}
         for index, entity in ipairs(found) do
             table.insert(output, entity)
@@ -388,16 +390,19 @@ function getPossibleTraversalPieces(rail, movementOrientation, sardine)
     end]]--
 
     for index, value in ipairs(output) do
-        sardine.train.carriages[1].get_driver().create_local_flying_text{text="Potential traverse ", position={x=value.position.x, y=value.position.y-(index*0.5)}}
+        debugFlyMsg("Potential traverse ", {x=value.position.x, y=value.position.y-(index*0.5)})
+        --sardine.train.carriages[1].get_driver().create_local_flying_text{text="Potential traverse ", position={x=value.position.x, y=value.position.y-(index*0.5)}}
     end
 
-    output = removePerpendicular(output, rail)
-    output = SortOrientations(output, rail, movementOrientation)
-    if #output > 0 then
+    output = removePerpendicular(output, rail) --To prevent accidentally jumping to a perpendicular rail line.
+    output = SortOrientations(output, movementOrientation) --To ensure the natural direction is the first returned element.
+    
+    if #output > 0 then --Debug msg that informs which rail piece was selected to be first.
         local pickedOrientation = output[1].bounding_box.orientation
         if pickedOrientation == nil then pickedOrientation = output[1].orientation end
         if #output > 1 then debugFlyMsg("Picked rail w/ orientation: "..pickedOrientation, {x=output[1].position.x,y=output[1].position.y-5}) end
     end
+
     return output
 end
 
@@ -410,13 +415,13 @@ function removePerpendicular(input, rail)
     if #output == 0 then return output end --Return early to avoid calling unncessesary code.
 
     local railOrientation = rail.bounding_box.orientation
-    if railOrientation == nil then railOrientation = rail.orientation end
+    if railOrientation == nil then railOrientation = rail.orientation end --Use the input rail orientation to figure out what axis we're on. Don't need to worry about which side of the axis we're moving.
 
     local i = 1
-    while i <= #output do
+    while i <= #output do --Using a while loop to prevent iteration issues.
         local entityOrientation = output[i].bounding_box.orientation
         if entityOrientation == nil then entityOrientation = output[i].orientation end
-        local difference = math.min(math.abs(railOrientation - entityOrientation), 1-math.abs(railOrientation - entityOrientation))
+        local difference = math.min(math.abs(railOrientation - entityOrientation), 1-math.abs(railOrientation - entityOrientation)) --spooky math that basically gets the difference between two points on a cyclical system
 
         if (difference >= 0.1875 and difference <= 0.3125) or (difference >= 0.6875 and difference <= 0.8125) then
             table.remove(output, i) --We avoid using a for loop to prevent skipping elements as table.remove() shifts values.
@@ -428,9 +433,10 @@ function removePerpendicular(input, rail)
     return output
 end
 
----comment
+---Traces a line of ghost rails until the end is reached or maximum number of rails is traced.
 ---@param sardine LuaEntity Train to source initial orientation from.
 ---@param rail LuaEntity|nil Rail to start tracing from.
+---@return (LuaEntity)[]
 function traceGhostLine(sardine, rail)
     local rails = {}
     local difference = 0
@@ -438,8 +444,6 @@ function traceGhostLine(sardine, rail)
     local lastRail = nil
     local orientation = sardine.draw_data.orientation
     local newOrientation = 0
-    local dFromZero = 0
-    local dFromHalf = 0
 
     while curRail ~= nil do --This is probably easier to do if you're good at trig
         table.insert(rails, curRail)
@@ -452,8 +456,8 @@ function traceGhostLine(sardine, rail)
         if curRail.bounding_box.orientation ~= nil then newOrientation = curRail.bounding_box.orientation else newOrientation = curRail.orientation end
         difference = math.min(math.abs(orientation - newOrientation), 1-math.abs(orientation - newOrientation))
 
-        if difference > 0.125 then
-            orientation = newOrientation + 0.5
+        if difference > 0.125 then 
+            orientation = newOrientation + 0.5 --Presumably, if a traversal piece is more than 0.125 off then it is just reporting the wrong side of the axis so we flip it. (The cyclic system has a range of 0-1)
         else
             ---@diagnostic disable-next-line: cast-local-type
             orientation = newOrientation
@@ -466,7 +470,7 @@ function traceGhostLine(sardine, rail)
             end
         end]]--
 
-        while orientation > 1 do orientation =  orientation - 1 end
+        while orientation > 1 do orientation =  orientation - 1 end --If the number ends up above 1, we remove 1 until it is below to get the actual number.
 
         orientation = snapOrientation(orientation)
 
@@ -490,8 +494,9 @@ end
 
 ---Sorts a list of rails by closest orientation to the given SARDINE.
 ---@param input (LuaEntity)[]
----@param rail LuaEntity
-function SortOrientations(input, rail, movementOrientation)
+---@param movementOrientation number
+---@return (LuaEntity)[]
+function SortOrientations(input, movementOrientation)
     local baseOrientation = movementOrientation
 
     --[[if rail.bounding_box.orientation then
@@ -548,6 +553,7 @@ function SortOrientations(input, rail, movementOrientation)
     return output
 end
 
+---Ticks active sardines, allowing them to perform their duties if needed. Generally, they should only tick when there is a driver or while performing a job.
 function sardineLib.tickSardines()
     if #storage.data["tickingSardines"] == 0 then return end
     for index, value in pairs(storage.data["tickingSardines"]) do
