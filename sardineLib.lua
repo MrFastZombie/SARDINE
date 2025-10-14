@@ -268,14 +268,16 @@ end
 ---@param rail LuaEntity
 ---@param movementOrientation number
 ---@param sardine LuaEntity
+---@param checkForLivingPieces boolean?
 ---@return (LuaEntity)[]
-function getPossibleTraversalPieces(rail, movementOrientation, sardine)
+function getPossibleTraversalPieces(rail, movementOrientation, sardine, checkForLivingPieces)
     local railType = nil
         if rail.name ~= "entity-ghost" then railType = rail.name
         else railType = rail.ghost_type end
     local elevated = isRailElevated(rail)
     local offsetMult = {x=1,y=1}
     local checkTiles = {}
+    local checkForLivingPieces = checkForLivingPieces or false
 
     --- QUADRANT OFFSET ---
     if movementOrientation >= 0 and movementOrientation <= 0.25 then --First quadrant
@@ -443,12 +445,15 @@ function getPossibleTraversalPieces(rail, movementOrientation, sardine)
 
 
     for index, tile in ipairs(checkTiles) do --Search all the potential spots.
+        local found
         local name = tile[1]
         if elevated and name ~= "rail-ramp" then name = "elevated-"..name end --If elevated and not a ramp, add elevated to the name.
         local position = rail.position
         position.x = position.x+tile[2].x
         position.y = position.y+tile[2].y
-        local found = rail.surface.find_entities_filtered{position = position, radius = 1, type="entity-ghost", ghost_name=name}
+        if checkForLivingPieces == false then found = rail.surface.find_entities_filtered{position = position, radius = 1, type="entity-ghost", ghost_name=name}
+        else found = rail.surface.find_entities_filtered{position = position, radius = 1, type=name}
+        end
         for index, entity in ipairs(found) do
             table.insert(output, entity)
         end
