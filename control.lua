@@ -4,6 +4,10 @@ script.on_init(function ()
     sardineLib.initData()
 end)
 
+script.on_configuration_changed(function ()
+    sardineLib.initData()
+end)
+
 script.on_event(defines.events.on_player_driving_changed_state, function(event)
     local player = game.get_player(event.player_index)
         if not player then return end
