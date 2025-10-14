@@ -173,13 +173,17 @@ end
 ---Helper function, displays floating debug text when debugging is enabled.
 ---@param msg string
 ---@param pos {x:number, y:number}
-function debugFlyMsg(msg, pos)
+function debugFlyMsg(msg, pos, ontick)
     local debug = true
+    local ontick = ontick or true
+    local tick = game.tick
     --TODO: Add a debug setting.
     if debug == true then
         if #storage.data["tickingSardines"] == 0 then return end
-        for index, value in pairs(storage.data["tickingSardines"]) do
-            value.train.carriages[1].get_driver().create_local_flying_text{text=msg, position=pos}
+        if tick%60 == 0 or ontick == false then
+            for index, value in pairs(storage.data["tickingSardines"]) do
+                value.train.carriages[1].get_driver().create_local_flying_text{text=msg, position=pos}
+            end
         end
     end
 end
