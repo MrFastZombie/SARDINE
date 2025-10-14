@@ -223,7 +223,7 @@ function getPossibleTraversalPieces(rail, movementOrientation, sardine)
     --Some pieces need special action. For example, straight rail has to be offset along its traversal direction. (i.e. a piece facing north or south needs to be offset along the Y axis.)
     --See the table picture in the reference folder to see all the conditions I am checking for.
     if railType == "straight-rail" or railType == "elevated-straight-rail"  then --Straight rail & Diagonal Straight Rail
-        if snappedOrientation == 0 or snappedOrientation == 0.5 then --North/South
+        if snappedOrientation == 0 or snappedOrientation == 0.5 or snappedOrientation == 0.9375 or snappedOrientation == 0.0625 or snappedOrientation == 0.4375 or snappedOrientation == 0.5625 then --North/South
             table.insert(checkTiles,{
                 "straight-rail", {x=0,y=2*offsetMult.y}
             })
@@ -233,7 +233,7 @@ function getPossibleTraversalPieces(rail, movementOrientation, sardine)
             table.insert(checkTiles,{
                 "rail-ramp", {x=0,y=9*offsetMult.y}
             })
-        elseif snappedOrientation == 0.25 or snappedOrientation == 0.75 then --East/West
+        elseif snappedOrientation == 0.25 or snappedOrientation == 0.75 or snappedOrientation == 0.1875 or snappedOrientation == 0.3125 or snappedOrientation == 0.6875 or snappedOrientation == 0.8125 then --East/West
             table.insert(checkTiles,{
                 "straight-rail", {x=2*offsetMult.x,y=0}
             })
