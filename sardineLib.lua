@@ -4,11 +4,15 @@ local sardineLib = {}
 function sardineLib.initData()
     storage.data = storage.data or {}
     if not storage.data["tickingSardines"] then storage.data["tickingSardines"] = {} end
+    if not storage.data["sardinesOnJob"] then storage.data["sardinesOnJob"] = {} end
+    if not storage.data["sardineWorkTiles"] then storage.data["sardineWorkTiles"] = {} end
+    if not storage.data["sardineWorkOrients"] then storage.data["sardineWorkOrients"] = {} end
 end
 
 ---Add a sardine to the list of vehicles that should be running their on tick events
 ---@param sardine LuaEntity
 function sardineLib.startTicking(sardine)
+    if sardineLib.checkJobState(sardine) then return end
     if sardineLib.checkTickState(sardine) then return end
     storage.data["tickingSardines"][sardine.train.id] = sardine
 end
@@ -20,6 +24,62 @@ function sardineLib.stopTicking(sardine) --Stop ticking when: player is found to
     table.remove(storage.data["tickingSardines"],sardine.train.id)
 end
 
+---Starts ticking a sardine's job. Also stores the given entity list in the Sardine's job data for future reference.
+---@param sardine LuaEntity
+---@param entityList (LuaEntity)[]
+function sardineLib.startJob(sardine, entityList, orientationList)
+    if sardineLib.checkTickState(sardine) then sardineLib.stopTicking(sardine) end
+    if sardineLib.checkJobState(sardine) then return end
+    if storage.data["sardineWorkTiles"] == nil or storage.data["sardineWorkOrients"] == nil then sardineLib.initData() end
+    storage.data["sardineWorkTiles"][sardine.train.id] = entityList
+    storage.data["sardineWorkOrients"][sardine.train.id] = orientationList
+    storage.data["sardinesOnJob"][sardine.train.id] = sardine
+end
+
+---Stops ticking a sardine's job
+---@param sardine LuaEntity
+function sardineLib.stopJob(sardine) --Stop ticking when: player is found to not be in vehicle, when a vehicle has been given a task
+    if sardineLib.checkJobState(sardine) == false then return end
+    table.remove(storage.data["sardinesOnJob"],sardine.train.id)
+    table.remove(storage.data["sardineWorkTiles"],sardine.train.id)
+    table.remove(storage.data["sardineWorkOrients"],sardine.train.id)
+end
+
+---Gets the list of entities on a sardine's job.
+---@param sardine LuaEntity
+---@return (LuaEntity)[]|nil
+function sardineLib.getSardineJobEntityList(sardine)
+    if storage.data["sardineWorkTiles"] == nil then return nil end
+    if storage.data["sardineWorkTiles"][sardine.train.id] == nil then return nil end
+    local list = storage.data["sardineWorkTiles"][sardine.train.id]
+    return list
+end
+
+---Gets the list of entity orientations on a sardine's job.
+---@param sardine LuaEntity
+---@return (number)[]|nil
+function sardineLib.getSardineJobOrientationList(sardine)
+    if storage.data["sardineWorkOrients"] == nil then return nil end
+    if storage.data["sardineWorkOrients"][sardine.train.id] == nil then return nil end
+    local list = storage.data["sardineWorkOrients"][sardine.train.id]
+    return list
+end
+
+---Checks if a rail is in the job list of a SARDINE.
+---@param rail LuaEntity
+---@param sardine LuaEntity
+---@return boolean
+function railIsWorkEntity(rail, sardine)
+    local list = sardineLib.getSardineJobEntityList(sardine)
+    if list == nil then return false end
+    for key, value in pairs(list) do
+        if value.valid then
+            if value.unit_number == rail.unit_number then return true end
+        end
+    end
+    return false
+end
+
 ---Check if a sardine is set to tick.
 ---@param sardine LuaEntity
 ---@return boolean
@@ -28,6 +88,16 @@ function sardineLib.checkTickState(sardine)
     else return false
     end
 end
+
+---Check if a sardine is currently on a job
+---@param sardine any
+---@return boolean
+function sardineLib.checkJobState(sardine)
+    if storage.data["sardinesOnJob"][sardine.train.id] then return true
+    else return false
+    end
+end
+
 
 ---Get a S.A.R.D.I.N.E by ID
 ---@param id any
@@ -436,9 +506,10 @@ end
 ---Traces a line of ghost rails until the end is reached or maximum number of rails is traced.
 ---@param sardine LuaEntity Train to source initial orientation from.
 ---@param rail LuaEntity|nil Rail to start tracing from.
----@return (LuaEntity)[]
+---@return (LuaEntity)[], (number)[]
 function traceGhostLine(sardine, rail)
     local rails = {}
+    local orientations = {}
     local difference = 0
     local curRail = rail
     local lastRail = nil
@@ -447,6 +518,7 @@ function traceGhostLine(sardine, rail)
 
     while curRail ~= nil do --This is probably easier to do if you're good at trig
         table.insert(rails, curRail)
+        table.insert(orientations, orientation)
         lastRail = curRail
         dFromZero = math.abs(0-orientation)
         dFromHalf = math.abs(orientation-0.5)
@@ -456,7 +528,7 @@ function traceGhostLine(sardine, rail)
         if curRail.bounding_box.orientation ~= nil then newOrientation = curRail.bounding_box.orientation else newOrientation = curRail.orientation end
         difference = math.min(math.abs(orientation - newOrientation), 1-math.abs(orientation - newOrientation))
 
-        if difference > 0.125 then 
+        if difference > 0.125 then
             orientation = newOrientation + 0.5 --Presumably, if a traversal piece is more than 0.125 off then it is just reporting the wrong side of the axis so we flip it. (The cyclic system has a range of 0-1)
         else
             ---@diagnostic disable-next-line: cast-local-type
@@ -489,7 +561,8 @@ function traceGhostLine(sardine, rail)
         debugFlyMsg("Traced", value.position)
     end
 
-    return rails
+    table.insert(orientations, orientation)
+    return rails, orientations
 end
 
 ---Sorts a list of rails by closest orientation to the given SARDINE.
