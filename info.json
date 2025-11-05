@@ -1,7 +1,7 @@
 {
   "name": "SARDINE",
   "version": "0.1.0",
-  "title": "Sometimes Automated Rail Desployer In New Expansion",
+  "title": "Sometimes Automated Rail Deployer In New Expansion",
   "author": "MrFastZombie",
   "factorio_version": "2.0",
   "dependencies": ["base >= 2.0"],
