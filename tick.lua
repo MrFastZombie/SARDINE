@@ -1,0 +1,74 @@
+local sardineTick = {}
+
+local gui = require("__SARDINE__/gui")
+local sardineLib = require("__SARDINE__/sardineLib")
+
+---Ticks active sardines, allowing them to perform their duties if needed. Generally, they should only tick when there is a driver or while performing a job.
+function sardineTick.tickSardines()
+    --if #storage.data["tickingSardines"] == 0 then return end
+    for index, value in pairs(storage.data["tickingSardines"]) do
+        local player = value.train.carriages[1].get_driver()
+        if player ~= nil then
+            local playerSelected = player.selected
+            if playerSelected ~= nil then
+                sardineLib.getPossibleTraversalPieces(playerSelected, value.draw_data.orientation, value)
+    
+                local msgOri
+                if playerSelected.bounding_box.orientation ~= nil then
+                    msgOri = playerSelected.bounding_box.orientation else msgOri = playerSelected.orientation
+                end
+    
+                if playerSelected.name == "entity-ghost" then debugFlyMsg("Entity ori: "..msgOri.." True Orientation: "..getRelativeOrientation(playerSelected, value).. " Train orientation: "..snapOrientation(value.draw_data.orientation), value.train.carriages[1].position) end
+                if playerSelected.name == "entity-ghost" then debugFlyMsg(playerSelected.ghost_name.. " "..playerSelected.position.x.." "..playerSelected.position.y, playerSelected.position) end   
+            end
+        end
+
+        if storage.data["sardineLastTickRail"] == nil then sardineLib.initData() end
+        local lastRail = storage.data["sardineLastTickRail"][value.train.id]
+        if lastRail == nil then lastRail = "" end
+        
+        if value.train.front_end.rail ~= lastRail then
+            storage.data["sardineLastTickRail"][value.train.id] = value.train.front_end.rail
+            local ghost =  sardineLib.getPossibleTraversalPieces(value.train.front_end.rail, value.draw_data.orientation, value)[1]
+    
+            if ghost ~= nil then
+                local line, oris = sardineLib.traceGhostLine(value, ghost) --TODO: Rework this into an enqueue system. Have it process piecemeal every nth tick. 
+                if #line >= 1 then
+                    table.insert(line, 1, value.train.front_end.rail)
+                    --sardineLib.stopTicking(value)
+                    sardineLib.getCost(line)
+                    --sardineLib.startJob(value, line, oris)
+                    sardineLib.updateJobData(value, line, oris)
+                    --doJob(value, line)
+    
+                    if player ~= nil then
+                        gui.updateCosts(player, sardineLib.getCost(line))
+                    end
+                end
+            else
+                sardineLib.updateJobData(value, {}, {})
+                gui.updateCosts(player, sardineLib.getCost({}))
+            end
+        end
+        
+    end
+
+    if storage.data["sardinesOnJob"] == nil then sardineLib.initData() end
+    for index, sardine in pairs(storage.data["sardinesOnJob"]) do
+        local result = sardineLib.attemptRailPlacement(sardine)
+        if sardine.train.front_end.move_natural() ~= false then
+            sardine.train.manual_mode = true
+            sardine.train.speed = sardine.train.max_forward_speed*0.75
+        end
+
+        local onWorkRail = railIsWorkEntity(sardine.train.front_end.rail, sardine)
+
+        if onWorkRail == false or sardine.train.front_end.rail == storage.data["sardineWorkTiles"][sardine.train.id][#storage.data["sardineWorkTiles"][sardine.train.id]] then
+            sardineLib.stopJob(sardine)
+            sardine.train.speed = 0
+            --if sardine.get_driver ~= nil then sardineLib.setState(sardine) end
+        end
+    end
+end
+
+return sardineTick

@@ -1,3 +1,5 @@
+require("gui-styles")
+
 local sardine = table.deepcopy(data.raw["locomotive"]["locomotive"])
 local sardineItem = table.deepcopy(data.raw["item-with-entity-data"]["locomotive"])
 sardine.name = "MFZ-sardine"
@@ -10,7 +12,10 @@ local recipe = {
     name = "MFZ-sardine",
     enabled = true,
     ingredients = {
-        {type = "item", name = "locomotive", amount = 1}
+        {type = "item", name = "locomotive", amount = 1},
+        {type = "item", name = "raw-fish", amount = 1},
+        {type = "item", name = "electronic-circuit", amount = 1},
+        {type = "item", name = "inserter", amount = 1}
     },
     results = {{type = "item", name = "MFZ-sardine", amount = 1}}
 }

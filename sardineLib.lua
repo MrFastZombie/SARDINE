@@ -7,6 +7,23 @@ function sardineLib.initData()
     if not storage.data["sardinesOnJob"] then storage.data["sardinesOnJob"] = {} end
     if not storage.data["sardineWorkTiles"] then storage.data["sardineWorkTiles"] = {} end
     if not storage.data["sardineWorkOrients"] then storage.data["sardineWorkOrients"] = {} end
+    if not storage.data["sardinePotentialWork"] then storage.data["sardinePotentialWork"] = {} end
+    if not storage.data["sardineLastTickRail"] then storage.data["sardineLastTickRail"] = {} end
+end
+
+---Checks whether a SARDINE has a driver.
+---@param sardine LuaEntity
+---@return boolean
+function sardineLib.hasDriver(sardine)
+    local player = nil
+    for index, value in ipairs(sardine.train.carriages) do
+        if value.get_driver() ~= nil and value.name == "MFZ-sardine" then
+            player = value.get_driver()
+            break
+        end
+    end
+    if player ~= nil then return true end
+    return false
 end
 
 ---Add a sardine to the list of vehicles that should be running their on tick events
@@ -24,9 +41,109 @@ function sardineLib.stopTicking(sardine) --Stop ticking when: player is found to
     table.remove(storage.data["tickingSardines"],sardine.train.id)
 end
 
+---Updates the current potential job for a SARDINE.
+---@param sardine LuaEntity
+---@param entityList (LuaEntity)[]
+---@param orientationList (number)[]
+function sardineLib.updateJobData(sardine, entityList, orientationList)
+    if sardineLib.checkTickState(sardine) == false then return end
+    if sardineLib.checkJobState(sardine) then return end
+    if storage.data["sardinePotentialWork"] == nil then sardineLib.initData() end
+    if #orientationList < 1 or #entityList < 1 then
+        table.remove(storage.data["sardinePotentialWork"], sardine.train.id)
+        return
+    end
+    storage.data["sardinePotentialWork"][sardine.train.id] = {entityList=entityList, orientationList=orientationList}
+end
+
+---Calculates the required items to do a job.
+---@param input (LuaEntity)[]|LuaEntity Either an entity list or a SARDINE. If given a Sardine, it'll pull the entity list corresponding to the SARDINE's potential work. Entity list is ideal.
+function sardineLib.getCost(input)
+    local counts = {}
+    local countedItemIDs = {}
+
+    function countItem(item, itemID, amount) --yeah we're doin a nested function again
+        amount = amount or 1
+        if countedItemIDs[itemID] == nil then
+            for index, countedItem in ipairs(counts) do
+                if countedItem.name == item then
+                    countedItem.count = countedItem.count + amount
+                    break
+                elseif index == #counts then
+                    table.insert(counts, {name=item, count=amount})
+                end
+            end
+
+            if #counts == 0 then
+                table.insert(counts, {name=item, count=amount})
+            end
+        end
+    end
+
+    local entityList = nil
+
+    -- INPUT PROCESSING
+    if type(input) == "LuaEntity" then --If given a SARDINE
+        if storage.data["sardineWorkTiles"] then
+            entityList = storage.data["sardineWorkTiles"]
+        elseif storage.data["sardinePotentialWork"] then
+            entityList = storage.data["sardinePotentialWork"].entityList
+        end
+    elseif type(input) == "table" then
+        entityList = input
+    else
+        log("SARDING WARNING: getCost() somehow got value which is not a LuaEntity or table! Input: "..input)
+    end
+    -- END OF INPUT PROCESSING
+
+    if entityList == nil then return {} end
+
+    for index, entity in ipairs(entityList) do
+        if entity.name == "entity-ghost" then
+            local product = nil
+            local elevated = isRailElevated(entity)
+            local pendingTiles = entity.surface.find_entities_filtered{type = "tile-ghost", area = entity.bounding_box}
+            local potentialSupports = entity.surface.find_entities_filtered{type = "entity-ghost", area = entity.bounding_box, ghost_name = "rail-support"}
+            local deconstructions = entity.surface.find_entities_filtered{area = entity.bounding_box, to_be_deconstructed = true}
+
+            if prototypes.entity[entity.ghost_name].mineable_properties.products then
+                product = prototypes.entity[entity.ghost_name].mineable_properties.products[1] --TODO: This likely won't work for modded rails that intentionaly don't drop when mined. Also will not work for rails with multiple drops.
+            end
+            
+            if product == nil or #prototypes.entity[entity.ghost_name].mineable_properties.products > 1 then --Also making entities with multiple drops be considered unknown, to avoid miscounts. May add support if needed.
+                countItem("unknown", entity.unit_number) --I'll probably make this show up as a question mark in the UI.
+            else
+                local number = product.amount or product.amount_max --In case it has a probability drop.
+                countItem(product.name, entity.unit_number, number)
+            end
+            
+            if #pendingTiles >= 1 and not elevated then --I don't think we'll need to deal with tiles for elevated rails.
+                for i, tile in ipairs(pendingTiles) do
+                    if tile.ghost_name == "landfill" then countItem(tile.ghost_name, tile.unit_number) end --TODO: Add modded tile support? In case someone adds custom landfills.
+                end
+            end
+            if #potentialSupports >= 1 then
+                for i, support in ipairs(potentialSupports) do
+                    countItem(support.ghost_name, support.unit_number)
+                end
+            end
+            if #deconstructions >= 1 then
+                for i, deconstruction in ipairs(deconstructions) do
+                    if deconstruction.name == "cliff" then
+                        countItem("cliff-explosives", deconstruction.cliff_orientation..deconstruction.position.x..deconstruction.position.y) --Cliffs don't have a unit_number, so we'll just do this and hope it stays unique.
+                    end
+                end
+            end
+        end
+    end
+
+    return counts
+end
+
 ---Starts ticking a sardine's job. Also stores the given entity list in the Sardine's job data for future reference.
 ---@param sardine LuaEntity
 ---@param entityList (LuaEntity)[]
+---@param orientationList (number)[]
 function sardineLib.startJob(sardine, entityList, orientationList)
     if sardineLib.checkTickState(sardine) then sardineLib.stopTicking(sardine) end
     if sardineLib.checkJobState(sardine) then return end
@@ -43,6 +160,7 @@ function sardineLib.stopJob(sardine) --Stop ticking when: player is found to not
     table.remove(storage.data["sardinesOnJob"],sardine.train.id)
     table.remove(storage.data["sardineWorkTiles"],sardine.train.id)
     table.remove(storage.data["sardineWorkOrients"],sardine.train.id)
+    if sardineLib.hasDriver(sardine) == false then sardineLib.stopTicking(sardine) end
 end
 
 ---Gets the list of entities on a sardine's job.
@@ -97,7 +215,6 @@ function sardineLib.checkJobState(sardine)
     else return false
     end
 end
-
 
 ---Get a S.A.R.D.I.N.E by ID
 ---@param id any
@@ -270,7 +387,7 @@ end
 ---@param sardine LuaEntity
 ---@param checkForLivingPieces boolean?
 ---@return (LuaEntity)[]
-function getPossibleTraversalPieces(rail, movementOrientation, sardine, checkForLivingPieces)
+function sardineLib.getPossibleTraversalPieces(rail, movementOrientation, sardine, checkForLivingPieces)
     local railType = nil
         if rail.name ~= "entity-ghost" then railType = rail.name
         else railType = rail.ghost_type end
@@ -516,7 +633,7 @@ end
 ---@param sardine LuaEntity Train to source initial orientation from.
 ---@param rail LuaEntity|nil Rail to start tracing from.
 ---@return (LuaEntity)[], (number)[]
-function traceGhostLine(sardine, rail)
+function sardineLib.traceGhostLine(sardine, rail)
     local rails = {}
     local orientations = {}
     local difference = 0
@@ -557,7 +674,7 @@ function traceGhostLine(sardine, rail)
 
         --curRail = getNextGhost(sardine, curRail, orientation)
         --debugFlyMsg("Ori: "..orientation.." Diff: "..difference, {x=curRail.position.x, y=curRail.position.y+2})
-        local traversal = getPossibleTraversalPieces(curRail, orientation, sardine)
+        local traversal = sardineLib.getPossibleTraversalPieces(curRail, orientation, sardine)
         if #traversal > 0 then curRail = traversal[1] end
         if lastRail == curRail then break end
         if #rails >= 2500 then
@@ -635,29 +752,107 @@ function SortOrientations(input, movementOrientation)
     return output
 end
 
----Ticks active sardines, allowing them to perform their duties if needed. Generally, they should only tick when there is a driver or while performing a job.
-function sardineLib.tickSardines()
-    if #storage.data["tickingSardines"] == 0 then return end
-    for index, value in pairs(storage.data["tickingSardines"]) do
-        local playerSelected = value.train.carriages[1].get_driver().selected
-        if playerSelected ~= nil then 
-            getPossibleTraversalPieces(playerSelected, value.draw_data.orientation, value)
-
-            local msgOri
-            if playerSelected.bounding_box.orientation ~= nil then
-                msgOri = playerSelected.bounding_box.orientation else msgOri = playerSelected.orientation
-            end
-
-            if playerSelected.name == "entity-ghost" then debugFlyMsg("Entity ori: "..msgOri.." True Orientation: "..getRelativeOrientation(playerSelected, value).. " Train orientation: "..snapOrientation(value.draw_data.orientation), value.train.carriages[1].position) end
-            if playerSelected.name == "entity-ghost" then debugFlyMsg(playerSelected.ghost_name.. " "..playerSelected.position.x.." "..playerSelected.position.y, playerSelected.position) end
-        end
-
-        local ghost =  getPossibleTraversalPieces(value.train.front_end.rail, value.draw_data.orientation, value)[1]
-
-        if ghost ~= nil then
-            traceGhostLine(value, ghost)
+function sardineLib.attemptRailPlacement(sardine)
+    local curRail = sardine.train.front_end.rail
+    local nextRail = sardineLib.getPossibleTraversalPieces(curRail, sardine.draw_data.orientation, sardine)[1]
+    if nextRail == nil then return false end
+    local success = true
+    local desconstructions = nextRail.surface.find_entities_filtered{area = nextRail.bounding_box, to_be_deconstructed = true}
+    local tilesNeeded = nextRail.surface.find_entities_filtered{type = "tile-ghost", area = nextRail.bounding_box, force = nextRail.force} --I suspect the force check is optional here.
+    local collisions, entity = attemptRevive(sardine, nextRail)
+    if entity == nil then
+        local support = attemptBuildToNextSupport(sardine)
+        if support == false then
+            success = false
         end
     end
+    return success
+end
+
+---Attempts to revive a rail and update it in the job list. Returns the rail if succeeded.
+---@param sardine LuaEntity
+---@param rail LuaEntity
+---@return any, any
+function attemptRevive(sardine, rail)
+    if rail.valid == false then return nil end
+    local replacementIndex = getListTileIndex(sardine, rail.unit_number)
+    local collisions, entity = rail.revive()
+    if entity == nil then
+        return collisions
+    else
+        if replacementIndex ~= nil then
+            storage.data["sardineWorkTiles"][sardine.train.id][replacementIndex] = entity
+        end
+        return collisions, entity
+    end
+end
+
+---Attempts to build rails up to the next support and the support. Ramps can also be considered supports.
+---@param sardine LuaEntity
+---@return boolean
+function attemptBuildToNextSupport(sardine)
+    function buildBack(jobList, startRail) --yep im doing this
+        local i = #jobList
+        local foundStartRail = false
+        while i > 0 do
+            if jobList[i].valid then
+                if jobList[i] == startRail then foundStartRail = true end
+                if foundStartRail and jobList[i].type == "entity-ghost" then
+                    attemptRevive(sardine, jobList[i])
+                end
+            end
+            i = i - 1
+        end
+        return foundStartRail
+    end
+
+    local list = storage.data["sardineWorkTiles"][sardine.train.id]
+    local foundFirstGhost = false
+    for key, rail in pairs(list) do
+        if rail.valid ~= false then
+            if rail.type == "entity-ghost" then
+                foundFirstGhost = true
+                if rail.ghost_name == "rail-ramp" then
+                    attemptRevive(sardine, rail)
+                    local buildBackStatus = buildBack(list, rail)
+                    return buildBackStatus
+                else
+                    local check = rail.surface.find_entities_filtered{area = rail.bounding_box, type = "entity-ghost", ghost_name = "rail-support"} --I'm really glad it's just this simple to detect it.
+                    if #check > 0 then
+                        local collisions, entity = check[1].revive()
+                        if entity == nil then
+                            return false
+                        else
+                            local foundStartRail = buildBack(list, rail)
+                            return foundStartRail
+                        end
+                    end
+                end
+            end
+            local railIndex = getListTileIndex(sardine, rail.unit_number)
+            local orientationList = sardineLib.getSardineJobOrientationList(sardine)
+            if railIndex ~= nil and orientationList ~= nil and foundFirstGhost and orientationList[railIndex] ~= nil then
+                local checkForRamp = sardineLib.getPossibleTraversalPieces(rail, orientationList[railIndex], sardine, true)
+                for key, value in pairs(checkForRamp) do
+                    if value.type == "rail-ramp" then
+                        local buildBackStatus = buildBack(list, rail)
+                        return buildBackStatus
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+function getListTileIndex(sardine, unit)
+    local list = storage.data["sardineWorkTiles"][sardine.train.id]
+    for index, value in pairs(list) do
+        if value.valid ~= false then
+            if value.unit_number == unit then return index end
+        end
+    end
+    return nil
 end
 
 return sardineLib
