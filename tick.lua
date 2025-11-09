@@ -23,6 +23,18 @@ function sardineTick.tickSardines()
             end
         end
 
+        local line = {}
+        local oris = {}
+        if storage.data["sardineScanQueue"] then
+            if storage.data["sardineScanQueue"][value.train.id] then
+                local entry = storage.data["sardineScanQueue"][value.train.id]
+                if entry.complete == true then
+                    line = entry.rails
+                    oris = entry.orientations
+                end
+            end
+        end
+
         if storage.data["sardineLastTickRail"] == nil then sardineLib.initData() end
         local lastRail = storage.data["sardineLastTickRail"][value.train.id]
         if lastRail == nil then lastRail = "" end
@@ -32,25 +44,33 @@ function sardineTick.tickSardines()
             local ghost =  sardineLib.getPossibleTraversalPieces(value.train.front_end.rail, value.draw_data.orientation, value)[1]
     
             if ghost ~= nil then
-                local line, oris = sardineLib.traceGhostLine(value, ghost) --TODO: Rework this into an enqueue system. Have it process piecemeal every nth tick. 
-                if #line >= 1 then
-                    table.insert(line, 1, value.train.front_end.rail)
-                    --sardineLib.stopTicking(value)
-                    sardineLib.getCost(line)
-                    --sardineLib.startJob(value, line, oris)
-                    sardineLib.updateJobData(value, line, oris)
-                    --doJob(value, line)
-    
-                    if player ~= nil then
-                        gui.updateCosts(player, sardineLib.getCost(line))
-                    end
-                end
+                --local line, oris = sardineLib.processGhostLine(value, ghost)
+                sardineLib.enqueueTrace(value, ghost)
+                gui.setStatusLabel(player, "scan")
             else
                 sardineLib.updateJobData(value, {}, {})
-                gui.updateCosts(player, sardineLib.getCost({}))
+                sardineLib.deenqueueTrace(value)
+                if player ~= nil then
+                    gui.updateCosts(player, {})
+                    gui.setStatusLabel(player, "idle")
+                end
+            end
+        else
+            if #line >= 1 then
+                table.insert(line, 1, value.train.front_end.rail) --I don't remember why this was necessary but it appears to work fine with this.
+                --sardineLib.stopTicking(value)
+                --sardineLib.getCost(line)
+                sardineLib.deenqueueTrace(value)
+                --sardineLib.startJob(value, line, oris)
+                sardineLib.updateJobData(value, line, oris)
+                --doJob(value, line)
+
+                if player ~= nil then
+                    gui.updateCosts(player, sardineLib.getCost(line))
+                    gui.setStatusLabel(player, "ready")
+                end
             end
         end
-        
     end
 
     if storage.data["sardinesOnJob"] == nil then sardineLib.initData() end

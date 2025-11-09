@@ -32,3 +32,13 @@ script.on_nth_tick(1, function()
     --log("SARDINE: 60 ticks have passed")
     sardineTick.tickSardines()
 end)
+
+script.on_nth_tick(tonumber(settings.startup["sardine-trace-tick-time"].value), function() --This tick function handles scanning lines of ghost track, splitting it into batches. 
+    if storage.data["sardineScanQueue"] then
+        for index, entry in pairs(storage.data["sardineScanQueue"]) do
+            if entry.complete==false then
+                sardineLib.processGhostLine(entry.sardine)
+            end
+        end
+    end
+end)

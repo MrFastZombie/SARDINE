@@ -20,8 +20,8 @@ function gui.createGui(player)
 
     local bottomHFlow = innerFrame.add{type="flow", name="sardine-bottom-hflow", direction="horizontal", style="sardine-bottom-hflow"}
     local statusHFlow = bottomHFlow.add{type="flow", name="sardine-status-hflow", direction="horizontal", style="sardine-status-hflow"}
-    local status = statusHFlow.add{type="sprite", name="sardine-status-indicator", sprite="utility/status_working", style="status_image"}
-    local statusLabel = statusHFlow.add{type="label", name="sardine-status-label", caption='HELLO WORLD'}
+    local status = statusHFlow.add{type="sprite", name="sardine-status-indicator", sprite="utility/status_inactive", style="status_image"}
+    local statusLabel = statusHFlow.add{type="label", name="sardine-status-label", caption={"SARDINE.status-idle"}}
     local jobButton = bottomHFlow.add{type="button", name="sardine-job-button", style="confirm_button", caption = {'SARDINE.job-button'}, enabled=false}
 
     local testInput = {
@@ -39,6 +39,26 @@ function gui.createGui(player)
     --gui.updateCosts(player, testInput)
 end
 
+function gui.setStatusLabel(player, state)
+    local screen_element = player.gui.screen
+    if not screen_element["sardine-frame"] then return end
+    local statusIndicator = screen_element["sardine-frame"]["sardine-main-vflow"]["sardine-inner-frame"]["sardine-bottom-hflow"]["sardine-status-hflow"]["sardine-status-indicator"]
+    local statusLabel = screen_element["sardine-frame"]["sardine-main-vflow"]["sardine-inner-frame"]["sardine-bottom-hflow"]["sardine-status-hflow"]["sardine-status-label"]
+    if state == "idle" then
+        statusIndicator.sprite = "utility/status_inactive" --Values: status_working, status_not_working, status_yellow, status_blue, status_inactive
+        statusLabel.caption = {'SARDINE.status-idle'}
+    elseif state == "scan" then
+        statusIndicator.sprite = "utility/status_yellow"
+        statusLabel.caption = {'SARDINE.status-scanning'}
+    elseif state == "job" then
+        statusIndicator.sprite = "utility/status_yellow"
+        statusLabel.caption = {'SARDINE.status-on-job'}
+    elseif state == "ready" then
+        statusIndicator.sprite = "utility/status_working"
+        statusLabel.caption = {'SARDINE.status-ready'}
+    end
+end
+
 ---Sets the state of the start button
 ---@param player LuaPlayer
 ---@param state boolean
@@ -48,6 +68,7 @@ function gui.setButtonState(player, state)
 
     local button = screen_element["sardine-frame"]["sardine-main-vflow"]["sardine-inner-frame"]["sardine-bottom-hflow"]["sardine-job-button"]
 
+    gui.setStatusLabel(player, "ready")
     button.enabled = state
 end
 

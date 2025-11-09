@@ -9,6 +9,7 @@ function sardineLib.initData()
     if not storage.data["sardineWorkOrients"] then storage.data["sardineWorkOrients"] = {} end
     if not storage.data["sardinePotentialWork"] then storage.data["sardinePotentialWork"] = {} end
     if not storage.data["sardineLastTickRail"] then storage.data["sardineLastTickRail"] = {} end
+    if not storage.data["sardineScanQueue"] then storage.data["sardineScanQueue"] = {} end
 end
 
 ---Checks whether a SARDINE has a driver.
@@ -68,14 +69,19 @@ function sardineLib.getCost(input)
             for index, countedItem in ipairs(counts) do
                 if countedItem.name == item then
                     countedItem.count = countedItem.count + amount
+                    countedItemIDs[itemID] = itemID
                     break
                 elseif index == #counts then
                     table.insert(counts, {name=item, count=amount})
+                    countedItemIDs[itemID] = itemID
+                    break
                 end
             end
 
             if #counts == 0 then
                 table.insert(counts, {name=item, count=amount})
+                countedItemIDs[itemID] = itemID
+                return
             end
         end
     end
@@ -585,10 +591,10 @@ function sardineLib.getPossibleTraversalPieces(rail, movementOrientation, sardin
         output = filterEntityLayer(sardine, output)
     end]]--
 
-    for index, value in ipairs(output) do
-        debugFlyMsg("Potential traverse ", {x=value.position.x, y=value.position.y-(index*0.5)})
+    --for index, value in ipairs(output) do
+        --debugFlyMsg("Potential traverse ", {x=value.position.x, y=value.position.y-(index*0.5)})
         --sardine.train.carriages[1].get_driver().create_local_flying_text{text="Potential traverse ", position={x=value.position.x, y=value.position.y-(index*0.5)}}
-    end
+   -- end
 
     output = removePerpendicular(output, rail) --To prevent accidentally jumping to a perpendicular rail line.
     output = SortOrientations(output, movementOrientation) --To ensure the natural direction is the first returned element.
@@ -629,26 +635,60 @@ function removePerpendicular(input, rail)
     return output
 end
 
+---Adds a SARDINE to the line processing queue.
+---@param sardine LuaEntity The SARDINE which is scanning a line.
+---@param rail LuaEntity The rail to start from.
+function sardineLib.enqueueTrace(sardine, rail)
+    if not storage.data["sardineScanQueue"] then sardineLib.initData() end
+    storage.data["sardineScanQueue"][sardine.train.id] = {rails={}, orientations={}, startRail=rail, sardine=sardine, complete=false}
+end
+
+function sardineLib.deenqueueTrace(sardine)
+    if not storage.data["sardineScanQueue"] then
+        sardineLib.initData()
+        return
+    end
+    if storage.data["sardineScanQueue"][sardine.train.id] then
+        storage.data["sardineScanQueue"][sardine.train.id] = nil
+    end
+    return
+end
+
 ---Traces a line of ghost rails until the end is reached or maximum number of rails is traced.
 ---@param sardine LuaEntity Train to source initial orientation from.
----@param rail LuaEntity|nil Rail to start tracing from.
----@return (LuaEntity)[], (number)[]
-function sardineLib.traceGhostLine(sardine, rail)
-    local rails = {}
-    local orientations = {}
+function sardineLib.processGhostLine(sardine)
+    local i = 0
     local difference = 0
-    local curRail = rail
-    local lastRail = nil
-    local orientation = sardine.draw_data.orientation
     local newOrientation = 0
+    
+    if not storage.data["sardineScanQueue"] then sardineLib.initData() end
+    if not storage.data["sardineScanQueue"][sardine.train.id] then return end --This shouldn't happen, but JIC.
+    
+    local queueEntry = storage.data["sardineScanQueue"][sardine.train.id]
+    local rails = queueEntry.rails or {}
+    local orientations = queueEntry.orientations or {}
+    local lastRail = queueEntry.rails[#queueEntry.rails] or nil --TODO: Not sure if this needs to be #-1 yet or not. I reckon it doesn't matter.
+    local curRail = queueEntry.rails[#queueEntry.rails] or queueEntry.startRail
+    local orientation = queueEntry.orientations[#queueEntry.orientations] or sardine.draw_data.orientation
 
     while curRail ~= nil do --This is probably easier to do if you're good at trig
-        table.insert(rails, curRail)
-        table.insert(orientations, orientation)
+        
+        if rails[#rails] ~= curRail then
+            table.insert(rails, curRail)
+            table.insert(orientations, orientation)
+        end
+        
+        if i == settings.global["sardine-trace-batch-size"].value then
+            storage.data["sardineScanQueue"][sardine.train.id] = {rails=rails, orientations=orientations, sardine=queueEntry.sardine, startRail=queueEntry.startRail, complete=false}
+            return
+        end
+
         lastRail = curRail
         dFromZero = math.abs(0-orientation)
         dFromHalf = math.abs(orientation-0.5)
+
         if curRail == nil then break end
+        i = i + 1
         --if orientation == 1 then orientation = 0 end
         --if orientation > 1 then orientation = orientation - 1 end
         if curRail.bounding_box.orientation ~= nil then newOrientation = curRail.bounding_box.orientation else newOrientation = curRail.orientation end
@@ -677,18 +717,21 @@ function sardineLib.traceGhostLine(sardine, rail)
         local traversal = sardineLib.getPossibleTraversalPieces(curRail, orientation, sardine)
         if #traversal > 0 then curRail = traversal[1] end
         if lastRail == curRail then break end
-        if #rails >= 2500 then
+        if #rails >= 2500 then --TODO: This is probably not needed anymore.
             log("SARDINE REACHED MAXIMUM RAIL COUNT")
             break
         end
     end
 
-    for index, value in ipairs(rails) do
+    --[[for index, value in ipairs(rails) do
         debugFlyMsg("Traced", value.position)
-    end
+    end]]
 
     table.insert(orientations, orientation)
-    return rails, orientations
+
+    storage.data["sardineScanQueue"][sardine.train.id] = {rails=rails, orientations=orientations, sardine=queueEntry.sardine, startRail=queueEntry.startRail, complete=true}
+
+    return
 end
 
 ---Sorts a list of rails by closest orientation to the given SARDINE.
