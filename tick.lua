@@ -2,6 +2,7 @@ local sardineTick = {}
 
 local gui = require("__SARDINE__/gui")
 local sardineLib = require("__SARDINE__/sardineLib")
+local dataManager = require("__SARDINE__/dataManager")
 
 ---Ticks active sardines, allowing them to perform their duties if needed. Generally, they should only tick when there is a driver or while performing a job.
 function sardineTick.tickSardines()
@@ -48,7 +49,7 @@ function sardineTick.tickSardines()
                 sardineLib.enqueueTrace(value, ghost)
                 gui.setStatusLabel(player, "scan")
             else
-                sardineLib.updateJobData(value, {}, {})
+                sardineLib.updateJobData(value, {}, {}) --TODO: Curently unused. Remove?
                 sardineLib.deenqueueTrace(value)
                 if player ~= nil then
                     gui.updateCosts(player, {})
@@ -66,6 +67,7 @@ function sardineTick.tickSardines()
                 --doJob(value, line)
 
                 if player ~= nil then
+                    dataManager.initInventory(value)
                     gui.updateCosts(player, sardineLib.getCost(line))
                     gui.setStatusLabel(player, "ready")
                 end
