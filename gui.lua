@@ -39,7 +39,14 @@ function gui.createGui(player)
     --gui.updateCosts(player, testInput)
 end
 
-function gui.setStatusLabel(player, state)
+---Sets the state of an indicator light on the UI to indicate the status of the SARDINE occupied by the player.
+---@param player LuaPlayer
+---@param state "idle"|"scan"|"job"|"ready"|"error"
+---@param error ? string Error text to display.
+function gui.setStatusLabel(player, state, error)
+    if player == nil then return end
+    error = error or "invalid error! (please report this as a bug)"
+    state = state or "idle"
     local screen_element = player.gui.screen
     if not screen_element["sardine-frame"] then return end
     local statusIndicator = screen_element["sardine-frame"]["sardine-main-vflow"]["sardine-inner-frame"]["sardine-bottom-hflow"]["sardine-status-hflow"]["sardine-status-indicator"]
@@ -56,6 +63,9 @@ function gui.setStatusLabel(player, state)
     elseif state == "ready" then
         statusIndicator.sprite = "utility/status_working"
         statusLabel.caption = {'SARDINE.status-ready'}
+    elseif state == "error" then
+        statusIndicator.sprite = "utility/status_not_working"
+        statusLabel.caption = {'SARDINE.status-error'..error}
     end
 end
 
