@@ -39,7 +39,8 @@ end
 ---@param sardine LuaEntity
 function sardineLib.stopTicking(sardine) --Stop ticking when: player is found to not be in vehicle, when a vehicle has been given a task
     if sardineLib.checkTickState(sardine) == false then return end
-    table.remove(storage.data["tickingSardines"],sardine.train.id)
+    --table.remove(storage.data["tickingSardines"],sardine.train.id) --This doesn't work for some reason...
+    storage.data["tickingSardines"][sardine.train.id] = nil
 end
 
 ---Updates the current potential job for a SARDINE.
