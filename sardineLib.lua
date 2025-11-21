@@ -43,21 +43,6 @@ function sardineLib.stopTicking(sardine) --Stop ticking when: player is found to
     storage.data["tickingSardines"][sardine.train.id] = nil
 end
 
----Updates the current potential job for a SARDINE.
----@param sardine LuaEntity
----@param entityList (LuaEntity)[]
----@param orientationList (number)[]
-function sardineLib.updateJobData(sardine, entityList, orientationList)
-    if sardineLib.checkTickState(sardine) == false then return end
-    if sardineLib.checkJobState(sardine) then return end
-    if storage.data["sardinePotentialWork"] == nil then sardineLib.initData() end
-    if #orientationList < 1 or #entityList < 1 then
-        table.remove(storage.data["sardinePotentialWork"], sardine.train.id)
-        return
-    end
-    storage.data["sardinePotentialWork"][sardine.train.id] = {entityList=entityList, orientationList=orientationList}
-end
-
 ---Calculates the required items to do a job.
 ---@param input (LuaEntity)[]|LuaEntity Either an entity list or a SARDINE. If given a Sardine, it'll pull the entity list corresponding to the SARDINE's potential work. Entity list is ideal.
 function sardineLib.getCost(input)

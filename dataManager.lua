@@ -5,6 +5,20 @@ function dataManager.initData()
     storage.data["sardineInventory"] = storage.data["sardineInventory"] or {}
     storage.data["sardinePoleCache"] = storage.data["sardinePoleCache"] or {}
     storage.data["sardinePlayerSettings"] = storage.data["sardinePlayerSettings"] or {}
+    storage.data["sardinePotentialWork"] = storage.data["sardinePotentialWork"] or {}
+end
+
+--Stores the current potential job for a SARDINE.
+---@param sardine LuaEntity
+---@param entityList (LuaEntity)[]
+---@param orientationList (number)[]
+function dataManager.storeJobData(sardine, entityList, orientationList)
+    if storage.data["sardinePotentialWork"] == nil then dataManager.initData() end
+    if #orientationList < 1 or #entityList < 1 then
+        table.remove(storage.data["sardinePotentialWork"], sardine.train.id)
+        return
+    end
+    storage.data["sardinePotentialWork"][sardine.train.id] = {entityList=entityList, orientationList=orientationList}
 end
 
 ---Stores a setting value based on player and key.
