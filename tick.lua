@@ -54,6 +54,7 @@ function sardineTick.tickSardines()
                 if player ~= nil then
                     gui.updateCosts(player, {})
                     gui.setStatusLabel(player, "idle")
+                    gui.setButtonState(player, false)
                 end
             end
         else
@@ -69,7 +70,7 @@ function sardineTick.tickSardines()
                 if player ~= nil then
                     dataManager.initInventory(value)
                     gui.updateCosts(player, sardineLib.getCost(line))
-                    gui.setStatusLabel(player, "ready")
+                    gui.setButtonState(player, true) --Thisn will also handle the status label.
                 end
             end
         end

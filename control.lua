@@ -42,3 +42,11 @@ script.on_nth_tick(tonumber(settings.startup["sardine-trace-tick-time"].value), 
         end
     end
 end)
+
+script.on_event(defines.events.on_gui_click, function(event)
+    gui.onClick(event)
+end)
+
+script.on_event(defines.events.on_gui_checked_state_changed, function(event)
+    gui.onCheckedStateChange(event)
+end)

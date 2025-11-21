@@ -149,10 +149,10 @@ end
 ---@param sardine LuaEntity
 function sardineLib.stopJob(sardine) --Stop ticking when: player is found to not be in vehicle, when a vehicle has been given a task
     if sardineLib.checkJobState(sardine) == false then return end
-    table.remove(storage.data["sardinesOnJob"],sardine.train.id)
-    table.remove(storage.data["sardineWorkTiles"],sardine.train.id)
-    table.remove(storage.data["sardineWorkOrients"],sardine.train.id)
-    if sardineLib.hasDriver(sardine) == false then sardineLib.stopTicking(sardine) end
+    storage.data["sardinesOnJob"][sardine.train.id] = nil
+    storage.data["sardineWorkTiles"][sardine.train.id] = nil
+    storage.data["sardineWorkOrients"][sardine.train.id] = nil
+    if sardineLib.hasDriver(sardine) ~= false then sardineLib.startTicking(sardine) end
 end
 
 ---Gets the list of entities on a sardine's job.

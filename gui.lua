@@ -78,7 +78,8 @@ function gui.setButtonState(player, state)
 
     local button = screen_element["sardine-frame"]["sardine-main-vflow"]["sardine-inner-frame"]["sardine-bottom-hflow"]["sardine-job-button"]
 
-    gui.setStatusLabel(player, "ready")
+    if state then gui.setStatusLabel(player, "ready") end
+
     button.enabled = state
 end
 
@@ -113,6 +114,31 @@ end
 function gui.createButton(player, state)
     local screen_element = player.gui.screen
     if screen_element["sardine-frame"] then
+    end
+end
+
+---Handles click events for the GUI.
+---@param event EventData.on_gui_click
+function gui.onClick(event)
+    local player = game.get_player(event.player_index)
+        if player == nil then return end
+    local sardine = nil
+
+    if(event.element.name == "sardine-job-button") then --Start job button
+        if player then
+            if player.vehicle ~= nil then
+                if player.vehicle.name == "MFZ-sardine" then
+                    sardine = player.vehicle
+                    if sardine ~= nil then
+                        local list, oris = dataManager.getJobData(sardine)
+                        if list ~= nil and oris ~= nil then
+                            sardineLib.startJob(sardine, list, oris)
+                        end
+                    end
+                end
+            end
+        end
+        return
     end
 end
 

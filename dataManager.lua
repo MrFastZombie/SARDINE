@@ -6,6 +6,13 @@ function dataManager.initData()
     storage.data["sardinePoleCache"] = storage.data["sardinePoleCache"] or {}
     storage.data["sardinePlayerSettings"] = storage.data["sardinePlayerSettings"] or {}
     storage.data["sardinePotentialWork"] = storage.data["sardinePotentialWork"] or {}
+---Gets the potential job data for a SARDINE.
+---@param sardine LuaEntity
+---@return LuaEntity[]|nil, number[]|nil
+function dataManager.getJobData(sardine)
+    if storage.data["sardinePotentialWork"] == nil then return nil, nil end
+    if storage.data["sardinePotentialWork"][sardine.train.id] == nil then return nil, nil end
+    return storage.data["sardinePotentialWork"][sardine.train.id]["entityList"], storage.data["sardinePotentialWork"][sardine.train.id]["orientationList"]
 end
 
 --Stores the current potential job for a SARDINE.
