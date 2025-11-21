@@ -7,7 +7,6 @@ function sardineLib.initData()
     if not storage.data["sardinesOnJob"] then storage.data["sardinesOnJob"] = {} end
     if not storage.data["sardineWorkTiles"] then storage.data["sardineWorkTiles"] = {} end
     if not storage.data["sardineWorkOrients"] then storage.data["sardineWorkOrients"] = {} end
-    if not storage.data["sardinePotentialWork"] then storage.data["sardinePotentialWork"] = {} end
     if not storage.data["sardineLastTickRail"] then storage.data["sardineLastTickRail"] = {} end
     if not storage.data["sardineScanQueue"] then storage.data["sardineScanQueue"] = {} end
 end

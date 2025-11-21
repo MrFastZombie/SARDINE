@@ -1,13 +1,18 @@
 local sardineLib = require("__SARDINE__/sardineLib")
 local gui = require("__SARDINE__/gui")
 local sardineTick = require("__SARDINE__/tick")
+local dataManager = require("__SARDINE__/dataManager")
 
 script.on_init(function ()
     sardineLib.initData()
+    dataManager.initData()
+    dataManager.cachePowerPoles()
 end)
 
 script.on_configuration_changed(function ()
     sardineLib.initData()
+    dataManager.initData()
+    dataManager.cachePowerPoles()
 end)
 
 script.on_event(defines.events.on_player_driving_changed_state, function(event)
