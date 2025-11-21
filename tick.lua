@@ -47,9 +47,9 @@ function sardineTick.tickSardines()
             if ghost ~= nil then
                 --local line, oris = sardineLib.processGhostLine(value, ghost)
                 sardineLib.enqueueTrace(value, ghost)
-                gui.setStatusLabel(player, "scan")
+                if player ~= nil then gui.setStatusLabel(player, "scan") end
             else
-                dataManager.storeJobData(value, {}, {}) --TODO: Curently unused. Remove?
+                dataManager.storeJobData(value, {}, {})
                 sardineLib.deenqueueTrace(value)
                 if player ~= nil then
                     gui.updateCosts(player, {})
