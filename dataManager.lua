@@ -3,6 +3,43 @@ local dataManager = {}
 function dataManager.initData()
     storage.data = storage.data or {}
     storage.data["sardineInventory"] = storage.data["sardineInventory"] or {}
+    storage.data["sardinePoleCache"] = storage.data["sardinePoleCache"] or {}
+    storage.data["sardinePlayerSettings"] = storage.data["sardinePlayerSettings"] or {}
+end
+
+---Stores a setting value based on player and key.
+---@param player LuaPlayer
+---@param key string
+---@param value any
+---@return boolean true Always returns true as of now. 
+function dataManager.savePlayerSetting(player, key, value)
+    if not storage.data["sardinePlayerSettings"] then dataManager.initData() end
+    storage.data["sardinePlayerSettings"][player.index] = storage.data["sardinePlayerSettings"][player.index] or {}
+    storage.data["sardinePlayerSettings"][player.index][key] = value
+    return true
+end
+
+---Gets a player's setting from a key
+---@param player LuaPlayer
+---@param key string
+---@return any
+function dataManager.getPlayerSetting(player, key)
+    if not storage.data["sardinePlayerSettings"] then dataManager.initData() end
+    if not storage.data["sardinePlayerSettings"][player.index] then return false end
+    if not storage.data["sardinePlayerSettings"][player.index][key] then return false end
+    return storage.data["sardinePlayerSettings"][player.index][key]
+end
+
+function dataManager.cachePowerPoles()
+    if not storage.data["sardinePoleCache"] then dataManager.initData() end
+    for key, pole in pairs(prototypes.get_entity_filtered({{filter="type", type="electric-pole"}})) do
+        if not pole.hidden then
+            local wireDistance = pole.get_max_wire_distance() --Can be affected by quality, but we'll probably treat them all as the base quality.
+            local maxCircuitWireDistance = pole.get_max_circuit_wire_distance()
+            local supplyArea = pole.get_supply_area_distance()
+            storage.data["sardinePoleCache"][key] = {wireDistance = wireDistance, circuitWireDistance = maxCircuitWireDistance, supplyArea = supplyArea, width=pole.tile_width, height=pole.tile_height, prototype=pole}
+        end
+    end
 end
 
 ---Clears the inventory tracking cache for a SARDINE when tracking is no longer needed.
