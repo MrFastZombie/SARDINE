@@ -49,7 +49,7 @@ function sardineTick.tickSardines()
                 sardineLib.enqueueTrace(value, ghost)
                 gui.setStatusLabel(player, "scan")
             else
-                sardineLib.updateJobData(value, {}, {}) --TODO: Curently unused. Remove?
+                dataManager.storeJobData(value, {}, {}) --TODO: Curently unused. Remove?
                 sardineLib.deenqueueTrace(value)
                 if player ~= nil then
                     gui.updateCosts(player, {})
@@ -63,7 +63,7 @@ function sardineTick.tickSardines()
                 --sardineLib.getCost(line)
                 sardineLib.deenqueueTrace(value)
                 --sardineLib.startJob(value, line, oris)
-                sardineLib.updateJobData(value, line, oris)
+                dataManager.storeJobData(value, line, oris)
                 --doJob(value, line)
 
                 if player ~= nil then
