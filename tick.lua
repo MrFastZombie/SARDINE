@@ -64,10 +64,10 @@ function sardineTick.tickSardines()
                 --sardineLib.getCost(line)
                 sardineLib.deenqueueTrace(value)
                 --sardineLib.startJob(value, line, oris)
-                dataManager.storeJobData(value, line, oris)
                 --doJob(value, line)
-
+                
                 if player ~= nil then
+                    dataManager.storeJobData(value, line, oris, player)
                     dataManager.initInventory(value)
                     gui.updateCosts(player, sardineLib.getCost(line))
                     gui.setButtonState(player, true) --Thisn will also handle the status label.

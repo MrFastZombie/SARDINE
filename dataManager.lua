@@ -8,24 +8,24 @@ function dataManager.initData()
     storage.data["sardinePotentialWork"] = storage.data["sardinePotentialWork"] or {}
 ---Gets the potential job data for a SARDINE.
 ---@param sardine LuaEntity
----@return LuaEntity[]|nil, number[]|nil
+---@return LuaEntity[]|nil, number[]|nil, LuaPlayer|nil
 function dataManager.getJobData(sardine)
     if storage.data["sardinePotentialWork"] == nil then return nil, nil end
     if storage.data["sardinePotentialWork"][sardine.train.id] == nil then return nil, nil end
-    return storage.data["sardinePotentialWork"][sardine.train.id]["entityList"], storage.data["sardinePotentialWork"][sardine.train.id]["orientationList"]
+    return storage.data["sardinePotentialWork"][sardine.train.id]["entityList"], storage.data["sardinePotentialWork"][sardine.train.id]["orientationList"], storage.data["sardinePotentialWork"][sardine.train.id]["player"]
 end
 
 --Stores the current potential job for a SARDINE.
 ---@param sardine LuaEntity
 ---@param entityList (LuaEntity)[]
 ---@param orientationList (number)[]
-function dataManager.storeJobData(sardine, entityList, orientationList)
+function dataManager.storeJobData(sardine, entityList, orientationList, player)
     if storage.data["sardinePotentialWork"] == nil then dataManager.initData() end
     if #orientationList < 1 or #entityList < 1 then
         table.remove(storage.data["sardinePotentialWork"], sardine.train.id)
         return
     end
-    storage.data["sardinePotentialWork"][sardine.train.id] = {entityList=entityList, orientationList=orientationList}
+    storage.data["sardinePotentialWork"][sardine.train.id] = {entityList=entityList, orientationList=orientationList, player=player}
 end
 
 ---Stores a setting value based on player and key.
