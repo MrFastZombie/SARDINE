@@ -49,7 +49,7 @@ function sardineTick.tickSardines()
                 sardineLib.enqueueTrace(value, ghost)
                 if player ~= nil then gui.setStatusLabel(player, "scan") end
             else
-                dataManager.storeJobData(value, {}, {})
+                dataManager.storeJobData(value, {}, {}, nil)
                 sardineLib.deenqueueTrace(value)
                 if player ~= nil then
                     gui.updateCosts(player, {})
