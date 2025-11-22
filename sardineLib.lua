@@ -90,7 +90,7 @@ function sardineLib.getCost(input)
 
     if entityList == nil then return {} end
 
-    for index, entity in ipairs(entityList) do
+    for index, entity in pairs(entityList) do
         if entity.name == "entity-ghost" then
             local product = nil
             local elevated = isRailElevated(entity)
