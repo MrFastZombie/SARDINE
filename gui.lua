@@ -42,7 +42,7 @@ end
 ---Sets the state of an indicator light on the UI to indicate the status of the SARDINE occupied by the player.
 ---@param player LuaPlayer
 ---@param state "idle"|"scan"|"job"|"ready"|"error"
----@param error ? LocalisedString Error text to display.
+---@param error ? string Error text to display.
 function gui.setStatusLabel(player, state, error)
     if player == nil then return end
     error = error or "invalid error! (please report this as a bug)"
@@ -65,7 +65,7 @@ function gui.setStatusLabel(player, state, error)
         statusLabel.caption = {'SARDINE.status-ready'}
     elseif state == "error" then
         statusIndicator.sprite = "utility/status_not_working"
-        statusLabel.caption = {'SARDINE.status-error'..error}
+        statusLabel.caption = {'SARDINE.status-error-'..error}
     end
 end
 

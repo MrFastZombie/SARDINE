@@ -1,4 +1,5 @@
 local sardineLib = {}
+local dataManager = require("__SARDINE__/dataManager")
 
 ---Initialize the mod's data.
 function sardineLib.initData()
@@ -172,21 +173,6 @@ function sardineLib.getSardineJobOrientationList(sardine)
     if storage.data["sardineWorkOrients"][sardine.train.id] == nil then return nil end
     local list = storage.data["sardineWorkOrients"][sardine.train.id]
     return list
-end
-
----Checks if a rail is in the job list of a SARDINE.
----@param rail LuaEntity
----@param sardine LuaEntity
----@return boolean
-function railIsWorkEntity(rail, sardine)
-    local list = sardineLib.getSardineJobEntityList(sardine)
-    if list == nil then return false end
-    for key, value in pairs(list) do
-        if value.valid then
-            if value.unit_number == rail.unit_number then return true end
-        end
-    end
-    return false
 end
 
 ---Check if a sardine is set to tick.
@@ -803,14 +789,15 @@ end
 ---@return any, any
 function attemptRevive(sardine, rail)
     if rail.valid == false then return nil end
-    local replacementIndex = getListTileIndex(sardine, rail.unit_number)
+    local replacementIndex = dataManager.getEntityListIndex(sardine, rail)
+    local prevUnitNum = rail.unit_number
     local collisions, entity = rail.revive()
     if entity == nil then
         return collisions
     else
-        if replacementIndex ~= nil then
-            storage.data["sardineWorkTiles"][sardine.train.id][replacementIndex] = entity
-        end
+        if replacementIndex ~= nil and prevUnitNum ~= nil then
+            dataManager.updateRevivedEntity(sardine, replacementIndex, prevUnitNum, entity)
+        else log("SARDINE LIB WARNING: Could not replace rail after revival!") end
         return collisions, entity
     end
 end
@@ -818,10 +805,13 @@ end
 ---Attempts to build rails up to the next support and the support. Ramps can also be considered supports.
 ---@param sardine LuaEntity
 ---@return boolean
-function attemptBuildToNextSupport(sardine)
+function attemptBuildToNextSupport(sardine) --TODO: Find out why this fails when the rail ends on the midpoint of the support.
     function buildBack(jobList, startRail) --yep im doing this
         local i = #jobList
         local foundStartRail = false
+
+        i = dataManager.getEntityListIndex(sardine, startRail)
+
         while i > 0 do
             if jobList[i].valid then
                 if jobList[i] == startRail then foundStartRail = true end
@@ -834,9 +824,13 @@ function attemptBuildToNextSupport(sardine)
         return foundStartRail
     end
 
-    local list = storage.data["sardineWorkTiles"][sardine.train.id]
+    --local list = storage.data["sardineWorkTiles"][sardine.train.id]
+    local list = dataManager.getJobData(sardine) or {}
     local foundFirstGhost = false
-    for key, rail in pairs(list) do
+    local i = dataManager.getEntityListIndex(sardine, sardine.train.front_end.rail) or 1
+    while i < #list do
+        local rail = list[i]
+
         if rail.valid ~= false then
             if rail.type == "entity-ghost" then
                 foundFirstGhost = true
@@ -857,7 +851,7 @@ function attemptBuildToNextSupport(sardine)
                     end
                 end
             end
-            local railIndex = getListTileIndex(sardine, rail.unit_number)
+            local railIndex = dataManager.getEntityListIndex(sardine, rail)
             local orientationList = sardineLib.getSardineJobOrientationList(sardine)
             if railIndex ~= nil and orientationList ~= nil and foundFirstGhost and orientationList[railIndex] ~= nil then
                 local checkForRamp = sardineLib.getPossibleTraversalPieces(rail, orientationList[railIndex], sardine, true)
@@ -869,18 +863,10 @@ function attemptBuildToNextSupport(sardine)
                 end
             end
         end
+
+        i = i+1
     end
     return false
-end
-
-function getListTileIndex(sardine, unit)
-    local list = storage.data["sardineWorkTiles"][sardine.train.id]
-    for index, value in pairs(list) do
-        if value.valid ~= false then
-            if value.unit_number == unit then return index end
-        end
-    end
-    return nil
 end
 
 return sardineLib

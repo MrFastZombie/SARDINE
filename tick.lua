@@ -79,16 +79,38 @@ function sardineTick.tickSardines()
     if storage.data["sardinesOnJob"] == nil then sardineLib.initData() end
     for index, sardine in pairs(storage.data["sardinesOnJob"]) do
         local result = sardineLib.attemptRailPlacement(sardine)
+        local count = dataManager.counter(sardine, "get")
         if sardine.train.front_end.move_natural() ~= false then
             sardine.train.manual_mode = true
             sardine.train.speed = sardine.train.max_forward_speed*0.75
         end
 
-        local onWorkRail = railIsWorkEntity(sardine.train.front_end.rail, sardine)
+        if result == true then
+            count = dataManager.counter(sardine, "add")
 
-        if onWorkRail == false or sardine.train.front_end.rail == storage.data["sardineWorkTiles"][sardine.train.id][#storage.data["sardineWorkTiles"][sardine.train.id]] then
+            if count % 10 == 0 then
+                log("Placed 10 pieces!") --TODO: Implement the actual logic.
+            end
+        end
+
+        
+        --local onWorkRail = sardineLib.railIsWorkEntity(sardine.train.front_end.rail, sardine)
+        local onWorkRail = dataManager.checkIfJobRail(sardine, sardine.train.front_end.rail)
+        local stuck = dataManager.checkPosition(sardine, 5)
+
+        if stuck or onWorkRail == false or sardine.train.front_end.rail == storage.data["sardineWorkTiles"][sardine.train.id][#storage.data["sardineWorkTiles"][sardine.train.id]] then
+            local _, _, player = dataManager.getJobData(sardine)
             sardineLib.stopJob(sardine)
+            dataManager.counter(sardine, "reset")
             sardine.train.speed = 0
+
+            if player ~= nil then
+                storage.data["sardineLastTickRail"][sardine.train.id] = sardine.train.front_end.rail
+                gui.setStatusLabel(player, "idle")
+                if stuck then gui.setStatusLabel(player, "error", "stuck") end
+                gui.setButtonState(player, false)
+                gui.updateCosts(player, {})
+            end
             --if sardine.get_driver ~= nil then sardineLib.setState(sardine) end
         end
     end

@@ -6,6 +6,55 @@ function dataManager.initData()
     storage.data["sardinePoleCache"] = storage.data["sardinePoleCache"] or {}
     storage.data["sardinePlayerSettings"] = storage.data["sardinePlayerSettings"] or {}
     storage.data["sardinePotentialWork"] = storage.data["sardinePotentialWork"] or {}
+    storage.data["sardineWorkIterator"] = storage.data["sardineWorkIterator"] or {}
+    storage.data["sardinePosCache"] = storage.data["sardinePosCache"] or {}
+    storage.data["sardineUIDList"] = storage.data["sardineUIDList"] or {}
+    storage.data["sardineEntityListCache"] = storage.data["sardineEntityListCache"] or {}
+end
+
+---Checks the current position of the SARDINE against the last time it was checked, and returns true if the maximum matches is met.
+---@param sardine LuaEntity
+---@param maxMatches number
+---@return boolean
+function dataManager.checkPosition(sardine, maxMatches)
+    local position = sardine.train.carriages[1].position
+
+    if storage.data["sardinePosCache"] == nil then dataManager.initData() end
+    if storage.data["sardinePosCache"][sardine.train.id] == nil then
+        storage.data["sardinePosCache"][sardine.train.id] = {pos=position, count=0}
+        return false
+    elseif storage.data["sardinePosCache"][sardine.train.id].pos.y == position.y and storage.data["sardinePosCache"][sardine.train.id].pos.x == position.x then
+        storage.data["sardinePosCache"][sardine.train.id].count = storage.data["sardinePosCache"][sardine.train.id].count + 1
+
+        if storage.data["sardinePosCache"][sardine.train.id].count == maxMatches then
+            return true
+        end
+        return false
+    else
+        storage.data["sardinePosCache"][sardine.train.id] = {pos=position, count=0}
+        return false
+    end
+end
+
+---Operates a counter that tracks how many pieces a train has moved in its job.
+---@param sardine LuaEntity
+---@param input "add"|"reset"|"get"
+function dataManager.counter(sardine, input)
+    if storage.data["sardineWorkIterator"] == nil then dataManager.initData() end
+
+    if storage.data["sardineWorkIterator"][sardine.train.id] == nil then storage.data["sardineWorkIterator"][sardine.train.id] = 0 end
+
+    if input == "add" then
+        storage.data["sardineWorkIterator"][sardine.train.id] = storage.data["sardineWorkIterator"][sardine.train.id] + 1
+        return storage.data["sardineWorkIterator"][sardine.train.id]
+    elseif input == "reset" then
+        storage.data["sardineWorkIterator"][sardine.train.id] = 0
+        return storage.data["sardineWorkIterator"][sardine.train.id]
+    end
+
+    return storage.data["sardineWorkIterator"][sardine.train.id]
+end
+
 ---Gets the potential job data for a SARDINE.
 ---@param sardine LuaEntity
 ---@return LuaEntity[]|nil, number[]|nil, LuaPlayer|nil
@@ -13,6 +62,82 @@ function dataManager.getJobData(sardine)
     if storage.data["sardinePotentialWork"] == nil then return nil, nil end
     if storage.data["sardinePotentialWork"][sardine.train.id] == nil then return nil, nil end
     return storage.data["sardinePotentialWork"][sardine.train.id]["entityList"], storage.data["sardinePotentialWork"][sardine.train.id]["orientationList"], storage.data["sardinePotentialWork"][sardine.train.id]["player"]
+end
+
+---Checks if a rail belongs to a SARDINE's job.
+---@param sardine LuaEntity
+---@param rail LuaEntity
+---@return boolean
+function dataManager.checkIfJobRail(sardine, rail)
+    if storage.data["sardineUIDList"] == nil then return false end
+    if storage.data["sardineUIDList"][sardine.train.id] == nil then return false end
+
+    local check = storage.data["sardineUIDList"][sardine.train.id][rail.unit_number]
+
+    if check ~= nil then return true end
+    return false
+end
+
+---Caches a list of work entities stored by their UID for quick access.
+---@param sardine LuaEntity
+---@param entityList LuaEntity[]
+function updateSardineUIDList(sardine, entityList)
+    if storage.data["sardineUIDList"] == nil then dataManager.initData() end
+    local output = {}
+
+    for index, entity in ipairs(entityList) do
+        output[entity.unit_number] = entity
+    end
+
+    storage.data["sardineUIDList"][sardine.train.id] = output
+end
+
+---Replaces a rail in the list with its revived version, as the previously stored ghost is now invalid.
+---@param sardine LuaEntity
+---@param index number
+---@param newRail LuaEntity
+function dataManager.updateRevivedEntity(sardine, index, oldUnitNum, newRail)
+    local cache = storage.data["sardineEntityListCache"][sardine.train.id] or {}
+    local UIDlist = storage.data["sardineUIDList"][sardine.train.id] or {}
+    local workTiles = storage.data["sardineWorkTiles"][sardine.train.id] or {}
+    local potentialWork = storage.data["sardinePotentialWork"][sardine.train.id] or {}
+
+    storage.data["sardineEntityListCache"][sardine.train.id][newRail.unit_number] = storage.data["sardineEntityListCache"][sardine.train.id][oldUnitNum]
+    storage.data["sardineEntityListCache"][sardine.train.id][oldUnitNum] = nil
+
+    storage.data["sardineUIDList"][sardine.train.id][oldUnitNum] = nil
+    storage.data["sardineUIDList"][sardine.train.id][newRail.unit_number] = newRail
+
+    storage.data["sardineWorkTiles"][sardine.train.id][index] = newRail
+
+    storage.data["sardinePotentialWork"][sardine.train.id]["entityList"][index] = newRail
+end
+
+---Gets the index of one of the entities in a SARDINE's entity list.
+---@param sardine LuaEntity
+---@param entity LuaEntity
+---@return number
+function dataManager.getEntityListIndex(sardine, entity)
+    if storage.data["sardineEntityListCache"] == nil then return 0 end
+    local check = storage.data["sardineEntityListCache"][sardine.train.id][entity.unit_number]
+
+    if check == nil then return 0 end
+    return check
+end
+
+---Caches the positions of stored entities in a SARDINE's work list.
+---@param sardine LuaEntity
+---@param entityList LuaEntity[]
+function cacheSardineEntityList(sardine, entityList)
+    if storage.data["sardineEntityListCache"] == nil then dataManager.initData() end
+
+    local output = {}
+
+    for index, entity in ipairs(entityList) do
+        output[entity.unit_number] = index
+    end
+
+    storage.data["sardineEntityListCache"][sardine.train.id] = output
 end
 
 --Stores the current potential job for a SARDINE.
@@ -23,9 +148,13 @@ function dataManager.storeJobData(sardine, entityList, orientationList, player)
     if storage.data["sardinePotentialWork"] == nil then dataManager.initData() end
     if #orientationList < 1 or #entityList < 1 then
         table.remove(storage.data["sardinePotentialWork"], sardine.train.id)
+        updateSardineUIDList(sardine, {})
+        cacheSardineEntityList(sardine, {})
         return
     end
     storage.data["sardinePotentialWork"][sardine.train.id] = {entityList=entityList, orientationList=orientationList, player=player}
+    updateSardineUIDList(sardine, entityList)
+    cacheSardineEntityList(sardine, entityList)
 end
 
 ---Stores a setting value based on player and key.
